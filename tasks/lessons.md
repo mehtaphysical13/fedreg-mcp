@@ -9,6 +9,13 @@ Captured per the user's global instructions — patterns and rules to prevent re
 
 ## In-flight
 
+### Vercel TS build uses nodenext module resolution
+- Local tsconfig used `moduleResolution: bundler` (permissive) → green build.
+- Vercel's build for `/api/*.ts` uses `nodenext` (strict) → required `.js` extensions on relative imports.
+- Both passes "completed" but the bundled output failed at runtime with a 500.
+- Lesson: any future Vercel-deployed TS project should default to `.js` extensions on relative imports OR mirror Vercel's tsconfig locally. Sed pass: `find src/lib api scripts -name "*.ts" | xargs sed -i '' -E 's|from "(\.\.?/[^"]+)"|from "\1.js"|g'`.
+- For the Factory template: bake this in from day one.
+
 ### federalregister.gov: search filter codes ≠ response type strings
 - Search expects `conditions[type][]=PRORULE` (code).
 - Response returns `type: "Proposed Rule"` (display string).

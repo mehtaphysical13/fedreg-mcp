@@ -6,7 +6,7 @@
  * that wrap external APIs.
  */
 
-import { log, shapeOf } from "./logger";
+import { log, shapeOf } from "./logger.js";
 
 export interface HttpClientOptions {
   source: string; // logged as `source` — e.g. "federalregister"

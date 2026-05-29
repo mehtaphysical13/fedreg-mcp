@@ -7,14 +7,14 @@ import type {
   FedRegAgencyRef,
   FedRegCfrReference,
   FedRegDocument,
-} from "./fedreg";
+} from "./fedreg.js";
 import type {
   AgencyRef,
   CfrReference,
   CommentPeriod,
   Rule,
   RuleStage,
-} from "./types";
+} from "./types.js";
 
 export function normalizeDocument(doc: FedRegDocument): Rule {
   return {
@@ -92,12 +92,13 @@ function normalizeAgency(a: FedRegAgencyRef): AgencyRef {
 }
 
 function normalizeCfrRef(c: FedRegCfrReference): CfrReference {
+  const partStr = c.part != null ? String(c.part) : undefined;
   return {
     title: c.title,
-    part: c.part,
+    part: partStr,
     citation:
       c.citation ??
-      (c.part != null ? `${c.title} CFR ${c.part}` : `${c.title} CFR`),
+      (partStr ? `${c.title} CFR ${partStr}` : `${c.title} CFR`),
   };
 }
 

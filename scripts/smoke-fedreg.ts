@@ -3,7 +3,7 @@
  * Run with: npx tsx scripts/smoke-fedreg.ts
  */
 
-import { searchArticles, getDocument, listAgencies } from "../src/lib/fedreg";
+import { searchArticles, getDocument, listAgencies } from "../src/lib/fedreg.js";
 
 async function main() {
   console.log("--- searchArticles: recent EPA proposed rules ---");

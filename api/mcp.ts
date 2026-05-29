@@ -12,8 +12,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Readable } from "node:stream";
-import { buildMcpServer } from "../src/lib/mcpServer";
-import { log } from "../src/lib/logger";
+import { buildMcpServer } from "../src/lib/mcpServer.js";
+import { log } from "../src/lib/logger.js";
 
 export const config = {
   runtime: "nodejs",

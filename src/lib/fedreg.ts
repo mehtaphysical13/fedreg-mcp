@@ -4,8 +4,8 @@
  * No auth required.
  */
 
-import { makeHttpClient } from "./http";
-import { TtlCache } from "./cache";
+import { makeHttpClient } from "./http.js";
+import { TtlCache } from "./cache.js";
 
 const client = makeHttpClient({
   source: "federalregister",
@@ -51,7 +51,7 @@ export interface FedRegAgencyRef {
 
 export interface FedRegCfrReference {
   title: number;
-  part?: number;
+  part?: string | number;
   citation?: string;
 }
 

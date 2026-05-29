@@ -13,19 +13,19 @@ import {
   searchArticles,
   getDocument,
   type FedRegDocCode,
-} from "./fedreg";
+} from "./fedreg.js";
 import {
   getDocket,
   listComments,
   RegulationsGovKeyMissingError,
-} from "./regulationsgov";
+} from "./regulationsgov.js";
 import {
   normalizeDocument,
   dedupeAcrossStages,
-} from "./normalize";
-import { resolveAgencies } from "./agencyHelp";
-import type { Rule } from "./types";
-import { log } from "./logger";
+} from "./normalize.js";
+import { resolveAgencies } from "./agencyHelp.js";
+import type { Rule } from "./types.js";
+import { log } from "./logger.js";
 
 // ===== Shared error helper =====
 

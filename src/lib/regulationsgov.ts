@@ -4,8 +4,8 @@
  * Requires a free api.data.gov key in REGULATIONS_GOV_API_KEY.
  */
 
-import { makeHttpClient } from "./http";
-import { TtlCache } from "./cache";
+import { makeHttpClient } from "./http.js";
+import { TtlCache } from "./cache.js";
 
 const cache = new TtlCache<unknown>(500);
 

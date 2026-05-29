@@ -29,7 +29,7 @@ export interface AgencyRef {
 
 export interface CfrReference {
   title: number;
-  part?: number;
+  part?: string; // CFR parts can include subparts/letters (e.g. "260", "260.10", "63 Subpart A")
   citation?: string; // e.g. "40 CFR 52"
 }
 

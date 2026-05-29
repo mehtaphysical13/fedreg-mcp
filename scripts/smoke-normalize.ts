@@ -2,9 +2,9 @@
  * Smoke test for normalization + agency resolution against the live API.
  */
 
-import { searchArticles, getDocument } from "../src/lib/fedreg";
-import { normalizeDocument, dedupeAcrossStages } from "../src/lib/normalize";
-import { resolveAgency, resolveAgencies } from "../src/lib/agencyHelp";
+import { searchArticles, getDocument } from "../src/lib/fedreg.js";
+import { normalizeDocument, dedupeAcrossStages } from "../src/lib/normalize.js";
+import { resolveAgency, resolveAgencies } from "../src/lib/agencyHelp.js";
 
 async function main() {
   console.log("--- resolveAgency tests ---");

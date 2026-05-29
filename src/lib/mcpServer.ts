@@ -5,7 +5,7 @@
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { log, shapeOf } from "./logger";
+import { log, shapeOf } from "./logger.js";
 import {
   searchRulesSchema,
   searchRulesDescription,
@@ -22,7 +22,7 @@ import {
   summarizeRuleSchema,
   summarizeRuleDescription,
   summarizeRuleHandler,
-} from "./tools";
+} from "./tools.js";
 
 type ToolHandler<A> = (args: A) => Promise<unknown>;
 

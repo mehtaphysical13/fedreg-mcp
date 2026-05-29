@@ -7,7 +7,7 @@
  * to hand-maintain a 470-entry constant. Common aliases are layered on top.
  */
 
-import { listAgencies, type FedRegAgency } from "./fedreg";
+import { listAgencies, type FedRegAgency } from "./fedreg.js";
 
 let cached: { byInput: Map<string, string>; loadedAt: number } | null = null;
 const TTL_MS = 24 * 60 * 60 * 1000;
