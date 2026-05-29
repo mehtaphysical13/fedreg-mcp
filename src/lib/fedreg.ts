@@ -111,6 +111,29 @@ export interface SearchArticlesParams {
   correlationId?: string;
 }
 
+/**
+ * Default field set we request on every search so results can be normalized
+ * to our canonical `Rule` shape without a follow-up getDocument call per row.
+ */
+const DEFAULT_SEARCH_FIELDS: string[] = [
+  "document_number",
+  "title",
+  "abstract",
+  "type",
+  "publication_date",
+  "effective_on",
+  "comments_close_on",
+  "comment_url",
+  "docket_id",
+  "docket_ids",
+  "agencies",
+  "cfr_references",
+  "html_url",
+  "pdf_url",
+  "raw_text_url",
+  "json_url",
+];
+
 export async function searchArticles(
   params: SearchArticlesParams
 ): Promise<FedRegSearchResponse> {
@@ -118,6 +141,7 @@ export async function searchArticles(
     per_page: params.perPage ?? 20,
     page: params.page ?? 1,
     order: params.order ?? "relevance",
+    "fields[]": DEFAULT_SEARCH_FIELDS,
   };
   if (params.query) query["conditions[term]"] = params.query;
   if (params.agencies && params.agencies.length)
