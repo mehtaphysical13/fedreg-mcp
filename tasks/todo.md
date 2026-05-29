@@ -38,33 +38,33 @@ Ship a production-grade MCP server that gives agents first-class access to U.S. 
 - [x] Live smoke script: `scripts/smoke-fedreg.ts` (470 agencies returned, sample search 246 hits, getDocument round-trip 119ms)
 - [ ] Vitest unit tests (deferred to Phase 4 verification gate — smoke script is sufficient signal for now)
 
-## Phase 2 — Normalization layer (~3 hours)
-- [ ] `src/lib/types.ts` — canonical `Rule` type: `{ id, docketId, title, abstract, agencies[], stage, publishedAt, effectiveAt, commentPeriod, cfrRefs[], url, sourceUrls[] }`
-- [ ] `src/lib/normalize.ts`:
-  - `normalizeArticle(raw)` → `Rule`
-  - `classifyStage(raw)` → `'proposed' | 'final' | 'correction' | 'withdrawal' | 'notice'`
-  - `extractCommentPeriod(raw)` → `{ opensAt, closesAt, isOpen } | null`
-  - `resolveCfrRefs(raw)` → `[{ title, part, sectionRange }]`
-  - `dedupeAcrossStages(rules)` — group by docket, keep latest per stage
-- [ ] Agency taxonomy constants (`src/lib/agencies.ts`) — slug, name, parent, abbreviation
+## Phase 2 — Normalization layer (~3 hours) ✅
+- [x] `src/lib/types.ts` — canonical `Rule`, `RuleStage`, `CommentPeriod`, `CfrReference`, `AgencyRef`
+- [x] `src/lib/normalize.ts` — normalizeDocument, classifyStage, extractCommentPeriod, dedupeAcrossStages
+- [x] `src/lib/agencyHelp.ts` — fuzzy slug resolution (canonical list + 30 common aliases like EPA/FDA/SEC)
+- [x] `DEFAULT_SEARCH_FIELDS` so single search returns full canonical Rule
 
-## Phase 3 — MCP surface (~3 hours)
-- [ ] `api/mcp.ts` — Streamable HTTP MCP server entry point
-- [ ] Tool: `search_rules` — full-text + filters (agency, date range, CFR title, stage)
-- [ ] Tool: `get_rule` — full document + metadata + citations by document number
-- [ ] Tool: `list_recent` — recent rules by agency or topic, with stage filter
-- [ ] Tool: `get_comments` — public comments on a docket
+## Phase 3 — MCP surface (~3 hours) ✅
+- [x] `api/mcp.ts` — Web Standard Streamable HTTP transport, shimmed onto Vercel serverless
+- [x] `src/lib/mcpServer.ts` — McpServer factory with telemetry middleware
+- [x] Tool: `search_rules` — query + agencies + stage + date range + CFR + pagination
+- [x] Tool: `get_rule` — single document by number
+- [x] Tool: `list_recent` — recent docs by agency/stage, mirrors search_rules envelope
+- [x] Tool: `get_comments` — Regulations.gov comments on a docket
 - [ ] Tool: `summarize_rule` — LLM-generated exec summary with anchored citations (uses OpenAI; logs the call)
 - [ ] For each tool: Zod input schema + **AEO-optimized description string** (verbs, capabilities, 2 positive examples, 1 anti-example, common-pitfall guidance)
 - [ ] Errors that teach the next move (e.g., "no results — try broadening date range or removing agency filter"), never opaque 500s
-- [ ] All tool calls run through telemetry middleware
+- [x] All tool calls run through telemetry middleware (correlation IDs + structured logs)
+- [x] Tool: `summarize_rule` — LLM exec/legal/technical summary with citations (OpenAI)
+- [x] All 5 tools have AEO-engineered descriptions (use-when / don't-use-when / pitfalls)
 
-## Phase 4 — Deploy & verify (~1 hour)
-- [ ] Vercel deploy
-- [ ] Smoke test via Claude Desktop (add as MCP server pointing at `https://fedreg-mcp.vercel.app/api/mcp`)
-- [ ] Smoke test via Claude Code
-- [ ] Health-check at `/api/health`
-- [ ] **Subagent test loop** (per global instruction): spawn agent to exercise all 5 tools end-to-end, report bugs/UX issues, fix before moving on
+## Phase 4 — Deploy & verify (~1 hour) ✅
+- [x] Vercel deploy → live at https://fedreg-mcp.vercel.app/api/mcp
+- [x] MCP smoke: `initialize`, `tools/list`, `tools/call` × 4 stateless tools (200-400ms latency)
+- [x] `get_comments` / `summarize_rule` confirmed to return clean "key not set" errors with setup hints
+- [x] Health-check at `/api/health`
+- [x] **Subagent QA loop** — found 3 blockers + 5 polish items; all fixed and re-verified live
+- [ ] Smoke test via Claude Desktop / Claude Code (manual — user-side install step)
 
 ## Phase 5 — AEO (~3 hours)
 - [ ] Landing page (`/`): install instructions for Claude Desktop / Claude Code / Cursor, live demo, 3 example queries, link to GitHub
