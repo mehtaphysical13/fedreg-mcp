@@ -12,6 +12,7 @@ import OpenAI from "openai";
 import {
   searchArticles,
   getDocument,
+  FEDREG_TOTAL_CAP,
   type FedRegDocCode,
 } from "./fedreg.js";
 import {
@@ -25,7 +26,12 @@ import {
 } from "./normalize.js";
 import { resolveAgencies } from "./agencyHelp.js";
 import type { Rule } from "./types.js";
+import { describeUpstreamError } from "./http.js";
 import { log } from "./logger.js";
+
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected ISO date YYYY-MM-DD");
 
 // ===== Shared error helper =====
 
@@ -79,12 +85,10 @@ export const searchRulesSchema = {
     .describe(
       'Filter by rule stage. "proposed" = Notice of Proposed Rulemaking, "final" = Final Rule, "notice" = misc notice.'
     ),
-  from_date: z
-    .string()
+  from_date: isoDate
     .optional()
     .describe("ISO date (YYYY-MM-DD). Inclusive lower bound on publication date."),
-  to_date: z
-    .string()
+  to_date: isoDate
     .optional()
     .describe("ISO date (YYYY-MM-DD). Inclusive upper bound on publication date."),
   cfr_title: z
@@ -106,7 +110,7 @@ export const searchRulesSchema = {
     .describe('Sort order. Default "relevance" with a query, "newest" without.'),
 };
 
-export const searchRulesDescription = `Search U.S. Federal Register rules by free-text query, agency, stage (proposed/final/notice), date range, and CFR title. Returns normalized rule records with title, abstract, agencies, CFR refs, comment period status, and citations.
+export const searchRulesDescription = `Search U.S. Federal Register rules by free-text query (title + abstract + indexed body), agency, stage (proposed/final/notice), date range, and CFR title. Returns normalized rule records with title, abstract, agencies, CFR refs, comment period status, and citations.
 
 Use this when the user wants to:
 - "Find recent EPA proposed rules on PFAS" → query="PFAS", agencies=["EPA"], stage="proposed"
@@ -118,7 +122,7 @@ Don't use this when:
 - You want public comments on a known docket (use get_comments)
 - The user wants a summary of a single rule (use summarize_rule)
 
-Pitfalls: leave query empty for pure browse-by-filter; use per_page=10-20 for chat contexts to avoid context bloat. The 'agencies' arg is fuzzy-resolved; check 'unresolved_agencies' in the response when results look wrong.`;
+Pitfalls: leave query empty for pure browse-by-filter; use per_page=10-20 for chat contexts. The 'agencies' arg is fuzzy-resolved; resolved + unresolved slugs are returned in the response so you can correct and retry. The 'total' field is capped at 10000 — check 'total_is_capped' to know if more matched.`;
 
 export async function searchRulesHandler(args: {
   query?: string;
@@ -132,9 +136,11 @@ export async function searchRulesHandler(args: {
   order?: "relevance" | "newest" | "oldest";
 }) {
   let agencySlugs: string[] | undefined;
+  let resolvedAgencies: string[] = [];
   let unresolvedAgencies: string[] = [];
   if (args.agencies && args.agencies.length) {
     const { resolved, unresolved } = await resolveAgencies(args.agencies);
+    resolvedAgencies = resolved;
     agencySlugs = resolved.length ? resolved : undefined;
     unresolvedAgencies = unresolved;
     if (!resolved.length && unresolved.length) {
@@ -145,17 +151,37 @@ export async function searchRulesHandler(args: {
     }
   }
 
-  const res = await searchArticles({
-    query: args.query,
-    agencies: agencySlugs,
-    type: args.stage ? [STAGE_TO_CODE[args.stage]] : undefined,
-    fromDate: args.from_date,
-    toDate: args.to_date,
-    cfrTitle: args.cfr_title,
-    perPage: args.per_page ?? 20,
-    page: args.page ?? 1,
-    order: args.order ?? (args.query ? "relevance" : "newest"),
-  });
+  const page = args.page ?? 1;
+  const perPage = args.per_page ?? 20;
+
+  let res;
+  try {
+    res = await searchArticles({
+      query: args.query,
+      agencies: agencySlugs,
+      type: args.stage ? [STAGE_TO_CODE[args.stage]] : undefined,
+      fromDate: args.from_date,
+      toDate: args.to_date,
+      cfrTitle: args.cfr_title,
+      perPage,
+      page,
+      order: args.order ?? (args.query ? "relevance" : "newest"),
+    });
+  } catch (e) {
+    return toolError(
+      `Search failed: ${describeUpstreamError(e)}.`,
+      "Verify date format is YYYY-MM-DD and dates are in the past. CFR title 40 covers environmental; CFR title 21 covers food/drug."
+    );
+  }
+
+  // Page beyond end of results: surface explicitly instead of silently
+  // looping back to page 1.
+  if (res.total_pages > 0 && page > res.total_pages) {
+    return toolError(
+      `Requested page ${page} is past the last page (${res.total_pages}).`,
+      `This query has ${res.total_pages} pages of results at per_page=${perPage}. Request a page within range.`
+    );
+  }
 
   const rules: Rule[] = res.results.map(normalizeDocument);
 
@@ -166,11 +192,14 @@ export async function searchRulesHandler(args: {
     );
   }
 
+  const totalIsCapped = res.count >= FEDREG_TOTAL_CAP;
   const payload = {
     total: res.count,
-    page: args.page ?? 1,
-    per_page: args.per_page ?? 20,
+    total_is_capped: totalIsCapped,
+    page,
+    per_page: perPage,
     total_pages: res.total_pages,
+    resolved_agencies: resolvedAgencies.length ? resolvedAgencies : undefined,
     unresolved_agencies: unresolvedAgencies.length ? unresolvedAgencies : undefined,
     rules,
   };
@@ -187,25 +216,25 @@ export const getRuleSchema = {
     ),
 };
 
-export const getRuleDescription = `Fetch a single Federal Register rule by its document number. Returns the full normalized record: title, abstract, agencies, CFR references, comment period, effective date, and citation URLs.
+export const getRuleDescription = `Fetch the canonical metadata for a single Federal Register rule by its document number: title, abstract, agencies, CFR references, comment period, effective date, and citation URLs (including a raw-text URL for the full document body).
 
 Use this when:
-- You have a document_number from a prior search_rules call and want the full record.
+- You have a document_number from a prior search_rules call and want the metadata record.
 - The user references a specific rule ID (e.g. "tell me about 2026-10643").
 
 Don't use this when:
 - You don't have a document number — use search_rules instead.
+- You need the body text of the rule — fetch sourceUrls.rawText with a regular HTTP GET.
 
-Pitfalls: document numbers look like "YYYY-NNNNN". They're not interchangeable with docket IDs (which have agency prefixes, e.g. "EPA-HQ-OAR-2024-0001"). Use get_comments for docket-level data.`;
+Pitfalls: document numbers look like "YYYY-NNNNN". They're NOT interchangeable with docket IDs (which have agency prefixes, e.g. "EPA-HQ-OAR-2024-0001"). Use get_comments for docket-level data.`;
 
 export async function getRuleHandler(args: { document_number: string }) {
   try {
     const doc = await getDocument(args.document_number);
     return ok(normalizeDocument(doc));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
     return toolError(
-      `Could not fetch document ${args.document_number}: ${msg}`,
+      `Could not fetch document ${args.document_number}: ${describeUpstreamError(e)}.`,
       "Verify the document number (format: YYYY-NNNNN). Numbers come from search_rules results."
     );
   }
@@ -256,11 +285,13 @@ export async function listRecentHandler(args: {
   per_page?: number;
 }) {
   const daysBack = args.days_back ?? 7;
+  const perPage = args.per_page ?? 20;
   const from = new Date();
   from.setUTCDate(from.getUTCDate() - daysBack);
   const fromDate = from.toISOString().slice(0, 10);
 
   let agencySlugs: string[] | undefined;
+  let resolvedAgencies: string[] = [];
   if (args.agency) {
     const { resolved } = await resolveAgencies([args.agency]);
     if (!resolved.length) {
@@ -270,15 +301,24 @@ export async function listRecentHandler(args: {
       );
     }
     agencySlugs = resolved;
+    resolvedAgencies = resolved;
   }
 
-  const res = await searchArticles({
-    agencies: agencySlugs,
-    type: args.stage ? [STAGE_TO_CODE[args.stage]] : undefined,
-    fromDate,
-    perPage: args.per_page ?? 20,
-    order: "newest",
-  });
+  let res;
+  try {
+    res = await searchArticles({
+      agencies: agencySlugs,
+      type: args.stage ? [STAGE_TO_CODE[args.stage]] : undefined,
+      fromDate,
+      perPage,
+      order: "newest",
+    });
+  } catch (e) {
+    return toolError(
+      `list_recent failed: ${describeUpstreamError(e)}.`,
+      "Retry shortly; if it persists, drop the agency or stage filter."
+    );
+  }
 
   const rules = dedupeAcrossStages(res.results.map(normalizeDocument));
 
@@ -289,10 +329,15 @@ export async function listRecentHandler(args: {
     );
   }
 
+  // Mirror the search_rules envelope so agents can reuse parsing logic.
   return ok({
+    total: res.count,
+    total_is_capped: res.count >= FEDREG_TOTAL_CAP,
+    page: 1,
+    per_page: perPage,
+    total_pages: res.total_pages,
     days_back: daysBack,
-    total_returned: rules.length,
-    upstream_total: res.count,
+    resolved_agencies: resolvedAgencies.length ? resolvedAgencies : undefined,
     rules,
   });
 }

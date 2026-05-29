@@ -134,6 +134,13 @@ const DEFAULT_SEARCH_FIELDS: string[] = [
   "json_url",
 ];
 
+/**
+ * Federal Register API caps `total` at 10,000 even when more documents match.
+ * When we see that ceiling we expose it explicitly so callers don't mistake
+ * the cap for an exact count.
+ */
+export const FEDREG_TOTAL_CAP = 10_000;
+
 export async function searchArticles(
   params: SearchArticlesParams
 ): Promise<FedRegSearchResponse> {
@@ -155,10 +162,25 @@ export async function searchArticles(
   if (params.cfrPart !== undefined)
     query["conditions[cfr][part]"] = params.cfrPart;
 
-  return client.request<FedRegSearchResponse>("documents.json", {
-    query,
-    correlationId: params.correlationId,
-  });
+  const raw = await client.request<Partial<FedRegSearchResponse>>(
+    "documents.json",
+    {
+      query,
+      correlationId: params.correlationId,
+    }
+  );
+
+  // Normalize the upstream shape:
+  //  - empty searches omit `results` entirely (not an empty array)
+  //  - empty searches omit `count` / `total_pages`
+  return {
+    count: raw.count ?? 0,
+    description: raw.description,
+    total_pages: raw.total_pages ?? 0,
+    next_page_url: raw.next_page_url ?? null,
+    previous_page_url: raw.previous_page_url ?? null,
+    results: raw.results ?? [],
+  };
 }
 
 export async function getDocument(

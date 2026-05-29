@@ -43,6 +43,22 @@ export class HttpError extends Error {
   }
 }
 
+/**
+ * User-facing summary of an HttpError. Drops the internal source/endpoint
+ * fragment that leaks otherwise — agents don't need to know we hit
+ * `federalregister documents/foo.json`.
+ */
+export function describeUpstreamError(e: unknown): string {
+  if (e instanceof HttpError) {
+    if (e.status === 404) return "not found";
+    if (e.status === 400) return "the upstream service rejected the request";
+    if (e.status === 429) return "rate limited by the upstream service";
+    if (e.status >= 500) return "the upstream service is temporarily unavailable";
+    return `upstream returned status ${e.status}`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function makeHttpClient(opts: HttpClientOptions) {
   const timeoutMs = opts.timeoutMs ?? 10_000;
 
