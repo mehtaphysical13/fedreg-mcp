@@ -564,10 +564,13 @@ End the summary with a single citation line in the format: "Source: <url>".`;
       stage: rule.stage,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    log.error("openai summarize failed", { msg });
+    const raw = e instanceof Error ? e.message : String(e);
+    log.error("llm summarize failed", { msg: raw });
+    // Sanitize: strip any URLs (some providers embed key-management links
+    // in error bodies that we don't want to expose to the agent's user).
+    const safe = raw.replace(/https?:\/\/\S+/g, "[link]");
     return toolError(
-      `LLM summarization failed: ${msg}`,
+      `LLM summarization failed: ${safe}`,
       "Retry; if it persists, fall back to get_rule and read the abstract directly."
     );
   }
