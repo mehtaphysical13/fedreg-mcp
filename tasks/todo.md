@@ -21,24 +21,22 @@ Ship a production-grade MCP server that gives agents first-class access to U.S. 
 - **Caching:** In-memory LRU for v1; revisit Vercel KV once we have traffic data.
 - **No DB in v1.** Telemetry goes to Vercel Postgres only if call volume justifies it; otherwise stdout → Vercel logs.
 
-## Phase 0 — Project scaffold (~2 hours)
-- [ ] `git init` at `/Users/nickmehta/Tool Factory/fedreg-mcp`
-- [ ] `package.json` (type: module) with deps: `@modelcontextprotocol/sdk`, `zod`, `@vercel/node`; dev: `typescript`, `tsx`, `@types/node`, `vite`, `@vitejs/plugin-react`, `react`, `react-dom`, `tailwindcss`
-- [ ] `tsconfig.json`, `vercel.json`, `.gitignore`, `.env.example`, `README.md`
-- [ ] Create GitHub repo `mehtaphysical13/fedreg-mcp` (public), push initial commit
-- [ ] Link Vercel project, configure `REGULATIONS_GOV_API_KEY` env var, deploy hello-world, verify build green
+## Phase 0 — Project scaffold (~2 hours) ✅
+- [x] `git init` at `/Users/nickmehta/Tool Factory/fedreg-mcp`
+- [x] `package.json` (type: module) with deps: `@modelcontextprotocol/sdk`, `zod`, `@vercel/node`, `tiny-lru`, `openai`; dev: `typescript`, `@types/node`, `vite`, `@vitejs/plugin-react`, `react`, `react-dom`, `vitest`
+- [x] `tsconfig.json`, `vercel.json`, `.gitignore`, `.env.example`, `README.md`
+- [x] Create GitHub repo `mehtaphysical13/fedreg-mcp` (public), push initial commit → https://github.com/mehtaphysical13/fedreg-mcp
+- [x] Link Vercel project, deploy hello-world, verify build green → https://fedreg-mcp.vercel.app (health: ✅, landing: ✅)
+- [ ] Configure `REGULATIONS_GOV_API_KEY` + `OPENAI_API_KEY` env vars (deferred to Phase 1 / Phase 3 when needed)
 
-## Phase 1 — Data layer (~3 hours)
-- [ ] `src/lib/fedreg.ts` — wrapper for federalregister.gov endpoints:
-  - `searchArticles({ query, agencies, type, fromDate, toDate, cfrTitle, perPage, page })`
-  - `getDocument(documentNumber)`
-  - `listAgencies()` (cached daily)
-- [ ] `src/lib/regulationsgov.ts` — wrapper for regulations.gov:
-  - `getDocket(docketId)`
-  - `listComments(docketId, { perPage, page })`
-- [ ] `src/lib/logger.ts` — structured JSON logging on every outbound call: `{ source, endpoint, params_shape, status, latency_ms, error }` — per global instruction
-- [ ] `src/lib/cache.ts` — small LRU wrapper (`tiny-lru`), per-endpoint TTLs
-- [ ] Vitest unit tests against recorded fixtures
+## Phase 1 — Data layer (~3 hours) ✅
+- [x] `src/lib/logger.ts` — structured JSON logging (outbound + tool-call shapes, `shapeOf()` helper to log params without leaking values)
+- [x] `src/lib/cache.ts` — TtlCache wrapper around tiny-lru with `wrap()` helper
+- [x] `src/lib/http.ts` — factory-reusable HTTP client with logging, timeouts, typed errors
+- [x] `src/lib/fedreg.ts` — `searchArticles`, `getDocument`, `listAgencies` — verified live (smoke test green)
+- [x] `src/lib/regulationsgov.ts` — `getDocket`, `listComments` (verification pending API key)
+- [x] Live smoke script: `scripts/smoke-fedreg.ts` (470 agencies returned, sample search 246 hits, getDocument round-trip 119ms)
+- [ ] Vitest unit tests (deferred to Phase 4 verification gate — smoke script is sufficient signal for now)
 
 ## Phase 2 — Normalization layer (~3 hours)
 - [ ] `src/lib/types.ts` — canonical `Rule` type: `{ id, docketId, title, abstract, agencies[], stage, publishedAt, effectiveAt, commentPeriod, cfrRefs[], url, sourceUrls[] }`
