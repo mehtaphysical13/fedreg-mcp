@@ -448,7 +448,7 @@ export const summarizeRuleSchema = {
     ),
 };
 
-export const summarizeRuleDescription = `Generate an executive summary of a Federal Register rule, with anchored citations back to the source. Uses an LLM under the hood.
+export const summarizeRuleDescription = `Generate a short summary of a Federal Register rule (executive / legal / technical tones), with anchored citations back to the source. Uses an LLM under the hood (OpenRouter or OpenAI).
 
 Use this when:
 - The user wants a quick read on a specific rule by document number.
@@ -458,17 +458,46 @@ Don't use this when:
 - The user wants a deep legal analysis (this is a summary, not a brief).
 - You don't have a document number — search_rules first.
 
-Pitfalls: requires OPENAI_API_KEY on the server. Costs ~$0.005/call. Cached by document_number+audience for 24h.`;
+Pitfalls: requires OPENROUTER_API_KEY or OPENAI_API_KEY on the server. Costs sub-cent per call.`;
+
+/**
+ * Resolve LLM credentials. Prefers OpenRouter (works with the existing
+ * Tool-Factory shared key) and falls back to OpenAI direct. Returns null
+ * when neither is configured.
+ */
+function resolveLlmClient(): { client: OpenAI; model: string } | null {
+  if (process.env.OPENROUTER_API_KEY) {
+    return {
+      client: new OpenAI({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: "https://openrouter.ai/api/v1",
+        defaultHeaders: {
+          "HTTP-Referer": "https://fedreg-mcp.vercel.app",
+          "X-Title": "fedreg-mcp",
+        },
+      }),
+      model: "openai/gpt-4o-mini",
+    };
+  }
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }),
+      model: "gpt-4o-mini",
+    };
+  }
+  return null;
+}
 
 export async function summarizeRuleHandler(args: {
   document_number: string;
   audience?: "executive" | "legal" | "technical";
 }) {
   const audience = args.audience ?? "executive";
-  if (!process.env.OPENAI_API_KEY) {
+  const llm = resolveLlmClient();
+  if (!llm) {
     return toolError(
-      "OPENAI_API_KEY is not configured on the server.",
-      "summarize_rule needs an OpenAI key. Until then, use get_rule to retrieve the abstract directly."
+      "No LLM credentials configured on the server (looking for OPENROUTER_API_KEY or OPENAI_API_KEY).",
+      "summarize_rule needs an LLM key. Until then, use get_rule to retrieve the abstract directly."
     );
   }
 
@@ -507,10 +536,9 @@ Source: ${rule.url}
 End the summary with a single citation line in the format: "Source: <url>".`;
 
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const start = Date.now();
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+    const completion = await llm.client.chat.completions.create({
+      model: llm.model,
       messages: [
         { role: "system", content: audienceSystem[audience] },
         { role: "user", content: userPrompt },
@@ -520,7 +548,7 @@ End the summary with a single citation line in the format: "Source: <url>".`;
     });
     const summary = completion.choices[0]?.message?.content ?? "";
     log.outbound({
-      source: "openai",
+      source: process.env.OPENROUTER_API_KEY ? "openrouter" : "openai",
       endpoint: "/chat/completions",
       method: "POST",
       paramsShape: { model: "string", audience: "string" },
