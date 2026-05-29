@@ -1,0 +1,47 @@
+{
+  "name": "fedreg-mcp",
+  "private": false,
+  "version": "0.1.0",
+  "description": "MCP server for U.S. Federal Register rules and Regulations.gov public comments. Built by Tool Factory.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Tool Factory",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mehtaphysical13/fedreg-mcp.git"
+  },
+  "homepage": "https://fedreg-mcp.vercel.app",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "federal-register",
+    "regulations",
+    "agent-tools",
+    "tool-factory"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "openai": "^4.80.0",
+    "tiny-lru": "^11.2.11",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vercel/node": "^3.2.29",
+    "@vitejs/plugin-react": "^4.3.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.3",
+    "vitest": "^2.1.8"
+  }
+}
